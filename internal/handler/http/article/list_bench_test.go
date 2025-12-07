@@ -54,6 +54,9 @@ func (b *benchListRepo) ExistsByURL(_ context.Context, _ string) (bool, error) {
 func (b *benchListRepo) ExistsByURLBatch(_ context.Context, _ []string) (map[string]bool, error) {
 	return nil, nil
 }
+func (b *benchListRepo) GetWithSource(_ context.Context, _ int64) (*entity.Article, string, error) {
+	return nil, "", nil
+}
 
 // BenchmarkListHandler_100Articles は100件の記事一覧取得の性能を測定
 func BenchmarkListHandler_100Articles(b *testing.B) {

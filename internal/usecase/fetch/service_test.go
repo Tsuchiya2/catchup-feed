@@ -131,6 +131,9 @@ func (s *stubArticleRepo) Delete(_ context.Context, _ int64) error {
 func (s *stubArticleRepo) ExistsByURL(_ context.Context, _ string) (bool, error) {
 	return false, nil
 }
+func (s *stubArticleRepo) GetWithSource(_ context.Context, _ int64) (*entity.Article, string, error) {
+	return nil, "", nil
+}
 
 // stubFeedFetcher はFeedFetcherのモック実装
 type stubFeedFetcher struct {

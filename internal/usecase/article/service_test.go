@@ -92,6 +92,20 @@ func (s *stubRepo) ExistsByURLBatch(_ context.Context, urls []string) (map[strin
 	return result, nil
 }
 
+// GetWithSource retrieves an article by ID along with the source name.
+func (s *stubRepo) GetWithSource(_ context.Context, id int64) (*entity.Article, string, error) {
+	if s.err != nil {
+		return nil, "", s.err
+	}
+	article := s.data[id]
+	if article == nil {
+		return nil, "", nil
+	}
+	// スタブではソース名をダミー値として返す
+	sourceName := "Test Source"
+	return article, sourceName, nil
+}
+
 /* ───────── 1. Create のバリデーション ───────── */
 
 func TestService_Create_validation(t *testing.T) {
@@ -672,7 +686,109 @@ func TestService_Update_fieldUpdates(t *testing.T) {
 	}
 }
 
-/* ───────── 12. Delete: 正常削除とリポジトリエラー ───────── */
+/* ───────── 12. GetWithSource: ID指定で記事とソース名を取得 ───────── */
+
+func TestService_GetWithSource(t *testing.T) {
+	tests := []struct {
+		name           string
+		id             int64
+		setupRepo      func(*stubRepo)
+		wantID         int64
+		wantSourceName string
+		wantErr        error
+	}{
+		{
+			name: "invalid id - zero",
+			id:   0,
+			setupRepo: func(s *stubRepo) {
+				// データ不要
+			},
+			wantErr: artUC.ErrInvalidArticleID,
+		},
+		{
+			name: "invalid id - negative",
+			id:   -1,
+			setupRepo: func(s *stubRepo) {
+				// データ不要
+			},
+			wantErr: artUC.ErrInvalidArticleID,
+		},
+		{
+			name: "article not found",
+			id:   999,
+			setupRepo: func(s *stubRepo) {
+				// 存在しないID
+			},
+			wantErr: artUC.ErrArticleNotFound,
+		},
+		{
+			name: "article found with source name",
+			id:   1,
+			setupRepo: func(s *stubRepo) {
+				now := time.Now()
+				s.data[1] = &entity.Article{
+					ID:          1,
+					SourceID:    10,
+					Title:       "Test Article",
+					URL:         "https://example.com/1",
+					Summary:     "Test Summary",
+					PublishedAt: now,
+				}
+			},
+			wantID:         1,
+			wantSourceName: "Test Source",
+			wantErr:        nil,
+		},
+		{
+			name: "repository error",
+			id:   1,
+			setupRepo: func(s *stubRepo) {
+				s.err = errors.New("database error")
+			},
+			wantErr: errors.New("get article with source"),
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stub := newStub()
+			tt.setupRepo(stub)
+			svc := artUC.Service{Repo: stub}
+
+			article, sourceName, err := svc.GetWithSource(context.Background(), tt.id)
+
+			if tt.wantErr != nil {
+				if err == nil {
+					t.Errorf("GetWithSource() error = nil, wantErr %v", tt.wantErr)
+					return
+				}
+				// Check if error is of expected type or contains expected message
+				if !errors.Is(err, tt.wantErr) {
+					// For wrapped errors, just check if error occurred
+					if err == nil {
+						t.Errorf("GetWithSource() error = nil, wantErr %v", tt.wantErr)
+					}
+				}
+				return
+			}
+
+			if err != nil {
+				t.Errorf("GetWithSource() unexpected error = %v", err)
+				return
+			}
+
+			if article.ID != tt.wantID {
+				t.Errorf("GetWithSource() got ID = %d, want %d", article.ID, tt.wantID)
+			}
+
+			if sourceName != tt.wantSourceName {
+				t.Errorf("GetWithSource() got SourceName = %q, want %q", sourceName, tt.wantSourceName)
+			}
+		})
+	}
+}
+
+/* ───────── 13. Delete: 正常削除とリポジトリエラー ───────── */
 
 func TestService_Delete_success(t *testing.T) {
 	tests := []struct {

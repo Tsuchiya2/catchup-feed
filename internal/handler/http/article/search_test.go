@@ -45,6 +45,9 @@ func (s *stubSearchRepo) ExistsByURL(_ context.Context, _ string) (bool, error) 
 func (s *stubSearchRepo) ExistsByURLBatch(_ context.Context, _ []string) (map[string]bool, error) {
 	return nil, nil
 }
+func (s *stubSearchRepo) GetWithSource(_ context.Context, _ int64) (*entity.Article, string, error) {
+	return nil, "", nil
+}
 
 func TestSearchHandler_Success(t *testing.T) {
 	now := time.Now()

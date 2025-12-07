@@ -13,6 +13,7 @@ import (
 func Register(mux *http.ServeMux, svc artUC.Service) {
 	mux.Handle("GET    /articles", ListHandler{svc})
 	mux.Handle("GET    /articles/search", SearchHandler{svc})
+	mux.Handle("GET    /articles/", auth.Authz(GetHandler{svc}))
 
 	mux.Handle("POST   /articles", auth.Authz(CreateHandler{svc}))
 	mux.Handle("PUT    /articles/", auth.Authz(UpdateHandler{svc}))

@@ -47,6 +47,9 @@ func (s *stubArticleRepo) ExistsByURL(_ context.Context, _ string) (bool, error)
 func (s *stubArticleRepo) ExistsByURLBatch(_ context.Context, _ []string) (map[string]bool, error) {
 	return nil, nil
 }
+func (s *stubArticleRepo) GetWithSource(_ context.Context, _ int64) (*entity.Article, string, error) {
+	return nil, "", nil
+}
 
 /* ───────── テストケース ───────── */
 

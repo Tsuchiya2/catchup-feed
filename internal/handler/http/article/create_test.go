@@ -45,6 +45,9 @@ func (s *stubCreateRepo) ExistsByURL(_ context.Context, _ string) (bool, error) 
 func (s *stubCreateRepo) ExistsByURLBatch(_ context.Context, _ []string) (map[string]bool, error) {
 	return nil, nil
 }
+func (s *stubCreateRepo) GetWithSource(_ context.Context, _ int64) (*entity.Article, string, error) {
+	return nil, "", nil
+}
 
 func TestCreateHandler_Success(t *testing.T) {
 	stub := &stubCreateRepo{}

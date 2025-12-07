@@ -2,6 +2,7 @@ package postgres_test
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"testing"
 	"time"
@@ -306,5 +307,150 @@ func TestArticleRepo_ExistsByURLBatch_AllExist(t *testing.T) {
 	}
 	if !result["https://example.com/article2"] {
 		t.Errorf("article2 should exist")
+	}
+}
+
+/* ─────────────────────────── 9. GetWithSource ─────────────────────────── */
+
+func TestArticleRepo_GetWithSource_Success(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	now := time.Date(2025, 7, 19, 0, 0, 0, 0, time.UTC)
+	want := &entity.Article{
+		ID:          1,
+		SourceID:    2,
+		Title:       "Go 1.24 released",
+		URL:         "https://example.com",
+		Summary:     "sum",
+		PublishedAt: now,
+		CreatedAt:   now,
+	}
+	wantSourceName := "Tech News"
+
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT a.id, a.source_id, a.title, a.url, a.summary, a.published_at, a.created_at, s.name AS source_name")).
+		WithArgs(int64(1)).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "source_id", "title", "url",
+			"summary", "published_at", "created_at", "source_name",
+		}).AddRow(
+			want.ID, want.SourceID, want.Title, want.URL,
+			want.Summary, want.PublishedAt, want.CreatedAt, wantSourceName,
+		))
+
+	repo := pg.NewArticleRepo(db)
+	got, sourceName, err := repo.GetWithSource(context.Background(), 1)
+	if err != nil {
+		t.Fatalf("GetWithSource err=%v", err)
+	}
+	if diff := cmp.Diff(want, got, cmp.AllowUnexported(entity.Article{})); diff != "" {
+		t.Fatalf("article mismatch (-want +got):\n%s", diff)
+	}
+	if sourceName != wantSourceName {
+		t.Errorf("sourceName = %q, want %q", sourceName, wantSourceName)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestArticleRepo_GetWithSource_NotFound(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT a.id")).
+		WithArgs(int64(999)).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "source_id", "title", "url",
+			"summary", "published_at", "created_at", "source_name",
+		}))
+
+	repo := pg.NewArticleRepo(db)
+	got, sourceName, err := repo.GetWithSource(context.Background(), 999)
+	if err != nil {
+		t.Fatalf("GetWithSource should not return error for not found, err=%v", err)
+	}
+	if got != nil {
+		t.Errorf("GetWithSource should return nil article for not found, got=%v", got)
+	}
+	if sourceName != "" {
+		t.Errorf("GetWithSource should return empty source name for not found, got=%q", sourceName)
+	}
+}
+
+func TestArticleRepo_GetWithSource_DatabaseError(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	dbError := errors.New("connection lost")
+	mock.ExpectQuery(regexp.QuoteMeta("SELECT a.id")).
+		WithArgs(int64(1)).
+		WillReturnError(dbError)
+
+	repo := pg.NewArticleRepo(db)
+	got, sourceName, err := repo.GetWithSource(context.Background(), 1)
+	if err == nil {
+		t.Fatalf("GetWithSource should return error for database error")
+	}
+	if got != nil {
+		t.Errorf("GetWithSource should return nil article on error, got=%v", got)
+	}
+	if sourceName != "" {
+		t.Errorf("GetWithSource should return empty source name on error, got=%q", sourceName)
+	}
+}
+
+func TestArticleRepo_GetWithSource_JoinWithSourceName(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	tests := []struct {
+		name           string
+		articleID      int64
+		sourceName     string
+		wantSourceName string
+	}{
+		{
+			name:           "source with simple name",
+			articleID:      1,
+			sourceName:     "TechCrunch",
+			wantSourceName: "TechCrunch",
+		},
+		{
+			name:           "source with space in name",
+			articleID:      2,
+			sourceName:     "Hacker News",
+			wantSourceName: "Hacker News",
+		},
+		{
+			name:           "source with special characters",
+			articleID:      3,
+			sourceName:     "Dev.to - Community",
+			wantSourceName: "Dev.to - Community",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock.ExpectQuery(regexp.QuoteMeta("SELECT a.id")).
+				WithArgs(tt.articleID).
+				WillReturnRows(sqlmock.NewRows([]string{
+					"id", "source_id", "title", "url",
+					"summary", "published_at", "created_at", "source_name",
+				}).AddRow(
+					tt.articleID, int64(10), "Test Title", "https://example.com",
+					"Test Summary", now, now, tt.sourceName,
+				))
+
+			repo := pg.NewArticleRepo(db)
+			_, sourceName, err := repo.GetWithSource(context.Background(), tt.articleID)
+			if err != nil {
+				t.Fatalf("GetWithSource err=%v", err)
+			}
+			if sourceName != tt.wantSourceName {
+				t.Errorf("sourceName = %q, want %q", sourceName, tt.wantSourceName)
+			}
+		})
 	}
 }
