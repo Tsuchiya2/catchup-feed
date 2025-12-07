@@ -49,6 +49,9 @@ func (b *benchListRepo) Delete(_ context.Context, _ int64) error {
 func (b *benchListRepo) Search(_ context.Context, _ string) ([]*entity.Article, error) {
 	return nil, nil
 }
+func (b *benchListRepo) SearchWithFilters(_ context.Context, _ []string, _ repository.ArticleSearchFilters) ([]*entity.Article, error) {
+	return nil, nil
+}
 func (b *benchListRepo) ExistsByURL(_ context.Context, _ string) (bool, error) {
 	return false, nil
 }

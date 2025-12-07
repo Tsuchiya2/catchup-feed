@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"time"
 
 	"catchup-feed/internal/domain/entity"
+	"catchup-feed/internal/pkg/search"
 	"catchup-feed/internal/repository"
 )
 
@@ -141,6 +143,79 @@ ORDER BY id ASC`
 		}
 		sources = append(sources, source)
 	}
+	return sources, rows.Err()
+}
+
+// SearchWithFilters searches sources with multi-keyword AND logic and optional filters
+func (repo *SourceRepo) SearchWithFilters(
+	ctx context.Context,
+	keywords []string,
+	filters repository.SourceSearchFilters,
+) ([]*entity.Source, error) {
+	// Return empty result if no keywords provided
+	if len(keywords) == 0 {
+		return []*entity.Source{}, nil
+	}
+
+	// Apply search timeout to prevent long-running queries
+	ctx, cancel := context.WithTimeout(ctx, search.DefaultSearchTimeout)
+	defer cancel()
+
+	// Build WHERE clause conditions
+	var conditions []string
+	var args []interface{}
+	paramIndex := 1
+
+	// Add keyword conditions (AND logic between keywords, OR logic within each keyword)
+	for _, kw := range keywords {
+		escapedKeyword := search.EscapeILIKE(kw)
+		conditions = append(conditions, fmt.Sprintf(
+			"(name ILIKE $%d OR feed_url ILIKE $%d)",
+			paramIndex, paramIndex,
+		))
+		args = append(args, escapedKeyword)
+		paramIndex++
+	}
+
+	// Add source_type filter if provided
+	if filters.SourceType != nil {
+		conditions = append(conditions, fmt.Sprintf("source_type = $%d", paramIndex))
+		args = append(args, *filters.SourceType)
+		paramIndex++
+	}
+
+	// Add active filter if provided
+	if filters.Active != nil {
+		conditions = append(conditions, fmt.Sprintf("active = $%d", paramIndex))
+		args = append(args, *filters.Active)
+	}
+
+	// Build final query
+	query := fmt.Sprintf(`
+SELECT id, name, feed_url, last_crawled_at, active, source_type, scraper_config
+FROM sources
+WHERE %s
+ORDER BY id ASC`,
+		strings.Join(conditions, "\n  AND "),
+	)
+
+	// Execute query
+	rows, err := repo.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("SearchWithFilters: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	// Scan results
+	sources := make([]*entity.Source, 0, 50)
+	for rows.Next() {
+		source, err := scanSource(rows)
+		if err != nil {
+			return nil, fmt.Errorf("SearchWithFilters: %w", err)
+		}
+		sources = append(sources, source)
+	}
+
 	return sources, rows.Err()
 }
 

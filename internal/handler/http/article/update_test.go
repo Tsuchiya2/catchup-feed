@@ -45,6 +45,9 @@ func (s *stubUpdateRepo) List(_ context.Context) ([]*entity.Article, error) {
 func (s *stubUpdateRepo) Search(_ context.Context, _ string) ([]*entity.Article, error) {
 	return nil, nil
 }
+func (s *stubUpdateRepo) SearchWithFilters(_ context.Context, _ []string, _ repository.ArticleSearchFilters) ([]*entity.Article, error) {
+	return nil, nil
+}
 func (s *stubUpdateRepo) Create(_ context.Context, _ *entity.Article) error {
 	return nil
 }

@@ -50,6 +50,18 @@ func (s *Service) Search(ctx context.Context, keyword string) ([]*entity.Source,
 	return sources, nil
 }
 
+// SearchWithFilters searches sources with multi-keyword support and optional filters.
+// Keywords are space-separated and use AND logic (all keywords must match).
+// Filters are optional and applied if provided.
+func (s *Service) SearchWithFilters(ctx context.Context, keywords []string, filters repository.SourceSearchFilters) ([]*entity.Source, error) {
+	// Delegate to repository
+	sources, err := s.Repo.SearchWithFilters(ctx, keywords, filters)
+	if err != nil {
+		return nil, fmt.Errorf("search sources with filters: %w", err)
+	}
+	return sources, nil
+}
+
 // Create creates a new source with the provided input.
 // It validates the input data including feed URL format before creating the source.
 // Returns a ValidationError if any input field is invalid.

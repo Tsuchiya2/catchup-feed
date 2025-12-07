@@ -12,6 +12,7 @@ import (
 
 	"catchup-feed/internal/domain/entity"
 	pg "catchup-feed/internal/infra/adapter/persistence/postgres"
+	"catchup-feed/internal/repository"
 )
 
 /* ─────────────────────────── ヘルパ ─────────────────────────── */
@@ -452,5 +453,186 @@ func TestArticleRepo_GetWithSource_JoinWithSourceName(t *testing.T) {
 				t.Errorf("sourceName = %q, want %q", sourceName, tt.wantSourceName)
 			}
 		})
+	}
+}
+
+/* ─────────────────────────── 10. SearchWithFilters ─────────────────────────── */
+
+func TestArticleRepo_SearchWithFilters_SingleKeyword(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	mock.ExpectQuery("FROM articles").
+		WithArgs("%Go%").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "source_id", "title", "url",
+			"summary", "published_at", "created_at",
+		}).AddRow(
+			int64(1), int64(2), "Go 1.24 released", "https://example.com",
+			"New Go version", now, now,
+		))
+
+	repo := pg.NewArticleRepo(db)
+	result, err := repo.SearchWithFilters(context.Background(), []string{"Go"}, repository.ArticleSearchFilters{})
+	if err != nil {
+		t.Fatalf("SearchWithFilters err=%v", err)
+	}
+	if len(result) != 1 {
+		t.Fatalf("SearchWithFilters len=%d, want 1", len(result))
+	}
+}
+
+func TestArticleRepo_SearchWithFilters_MultipleKeywords(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	mock.ExpectQuery("FROM articles").
+		WithArgs("%Go%", "%release%").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "source_id", "title", "url",
+			"summary", "published_at", "created_at",
+		}).AddRow(
+			int64(1), int64(2), "Go 1.24 released", "https://example.com",
+			"New Go version", now, now,
+		))
+
+	repo := pg.NewArticleRepo(db)
+	result, err := repo.SearchWithFilters(context.Background(), []string{"Go", "release"}, repository.ArticleSearchFilters{})
+	if err != nil {
+		t.Fatalf("SearchWithFilters err=%v", err)
+	}
+	if len(result) != 1 {
+		t.Fatalf("SearchWithFilters len=%d, want 1", len(result))
+	}
+}
+
+func TestArticleRepo_SearchWithFilters_WithSourceID(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	sourceID := int64(2)
+	mock.ExpectQuery("FROM articles").
+		WithArgs("%Go%", sourceID).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "source_id", "title", "url",
+			"summary", "published_at", "created_at",
+		}).AddRow(
+			int64(1), sourceID, "Go 1.24 released", "https://example.com",
+			"New Go version", now, now,
+		))
+
+	repo := pg.NewArticleRepo(db)
+	filters := repository.ArticleSearchFilters{SourceID: &sourceID}
+	result, err := repo.SearchWithFilters(context.Background(), []string{"Go"}, filters)
+	if err != nil {
+		t.Fatalf("SearchWithFilters err=%v", err)
+	}
+	if len(result) != 1 {
+		t.Fatalf("SearchWithFilters len=%d, want 1", len(result))
+	}
+}
+
+func TestArticleRepo_SearchWithFilters_WithDateRange(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	from := now.AddDate(0, 0, -7)
+	to := now
+	mock.ExpectQuery("FROM articles").
+		WithArgs("%Go%", from, to).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "source_id", "title", "url",
+			"summary", "published_at", "created_at",
+		}).AddRow(
+			int64(1), int64(2), "Go 1.24 released", "https://example.com",
+			"New Go version", now, now,
+		))
+
+	repo := pg.NewArticleRepo(db)
+	filters := repository.ArticleSearchFilters{From: &from, To: &to}
+	result, err := repo.SearchWithFilters(context.Background(), []string{"Go"}, filters)
+	if err != nil {
+		t.Fatalf("SearchWithFilters err=%v", err)
+	}
+	if len(result) != 1 {
+		t.Fatalf("SearchWithFilters len=%d, want 1", len(result))
+	}
+}
+
+func TestArticleRepo_SearchWithFilters_AllFilters(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	sourceID := int64(2)
+	from := now.AddDate(0, 0, -7)
+	to := now
+	mock.ExpectQuery("FROM articles").
+		WithArgs("%Go%", "%release%", sourceID, from, to).
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "source_id", "title", "url",
+			"summary", "published_at", "created_at",
+		}).AddRow(
+			int64(1), sourceID, "Go 1.24 released", "https://example.com",
+			"New Go version", now, now,
+		))
+
+	repo := pg.NewArticleRepo(db)
+	filters := repository.ArticleSearchFilters{
+		SourceID: &sourceID,
+		From:     &from,
+		To:       &to,
+	}
+	result, err := repo.SearchWithFilters(context.Background(), []string{"Go", "release"}, filters)
+	if err != nil {
+		t.Fatalf("SearchWithFilters err=%v", err)
+	}
+	if len(result) != 1 {
+		t.Fatalf("SearchWithFilters len=%d, want 1", len(result))
+	}
+}
+
+func TestArticleRepo_SearchWithFilters_EmptyKeywords(t *testing.T) {
+	db, _, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	repo := pg.NewArticleRepo(db)
+	result, err := repo.SearchWithFilters(context.Background(), []string{}, repository.ArticleSearchFilters{})
+	if err != nil {
+		t.Fatalf("SearchWithFilters err=%v", err)
+	}
+	if len(result) != 0 {
+		t.Fatalf("SearchWithFilters len=%d, want 0", len(result))
+	}
+}
+
+func TestArticleRepo_SearchWithFilters_SpecialCharacters(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	// Special characters: %, _, \
+	// These should be escaped by search.EscapeILIKE
+	mock.ExpectQuery("FROM articles").
+		WithArgs("%100\\%%", "%my\\_var%", "%path\\\\file%").
+		WillReturnRows(sqlmock.NewRows([]string{
+			"id", "source_id", "title", "url",
+			"summary", "published_at", "created_at",
+		}).AddRow(
+			int64(1), int64(2), "100% complete", "https://example.com",
+			"my_var in path\\file", now, now,
+		))
+
+	repo := pg.NewArticleRepo(db)
+	result, err := repo.SearchWithFilters(context.Background(), []string{"100%", "my_var", "path\\file"}, repository.ArticleSearchFilters{})
+	if err != nil {
+		t.Fatalf("SearchWithFilters err=%v", err)
+	}
+	if len(result) != 1 {
+		t.Fatalf("SearchWithFilters len=%d, want 1", len(result))
 	}
 }

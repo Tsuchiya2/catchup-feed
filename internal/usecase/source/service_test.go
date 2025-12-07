@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"catchup-feed/internal/domain/entity"
+	"catchup-feed/internal/repository"
 	srcUC "catchup-feed/internal/usecase/source"
 )
 
@@ -37,6 +38,14 @@ func (s *stubRepo) List(_ context.Context) ([]*entity.Source, error) {
 }
 func (s *stubRepo) Search(_ context.Context, _ string) ([]*entity.Source, error) {
 	return nil, s.err // テストでは未使用
+}
+func (s *stubRepo) SearchWithFilters(_ context.Context, keywords []string, filters repository.SourceSearchFilters) ([]*entity.Source, error) {
+	// テスト用の簡易実装
+	if s.err != nil {
+		return nil, s.err
+	}
+	// 実際の検索ロジックはリポジトリ層で実装されるため、ここでは空スライスを返す
+	return []*entity.Source{}, nil
 }
 func (s *stubRepo) Create(_ context.Context, src *entity.Source) error {
 	if s.err != nil {
@@ -533,7 +542,58 @@ func TestService_Update_fieldUpdates(t *testing.T) {
 	}
 }
 
-/* 11. Delete: 正常削除とリポジトリエラー */
+/* 11. SearchWithFilters: マルチキーワード検索 */
+func TestService_SearchWithFilters(t *testing.T) {
+	tests := []struct {
+		name      string
+		keywords  []string
+		setupRepo func(*stubRepo)
+		wantErr   bool
+	}{
+		{
+			name:     "single keyword",
+			keywords: []string{"Go"},
+			setupRepo: func(s *stubRepo) {
+				// 実際のデータはリポジトリ側で処理される
+			},
+			wantErr: false,
+		},
+		{
+			name:     "multi keywords",
+			keywords: []string{"Go", "blog"},
+			setupRepo: func(s *stubRepo) {
+				// 実際のデータはリポジトリ側で処理される
+			},
+			wantErr: false,
+		},
+		{
+			name:     "repository error",
+			keywords: []string{"Go"},
+			setupRepo: func(s *stubRepo) {
+				s.err = errors.New("search error")
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stub := newStub()
+			tt.setupRepo(stub)
+			svc := srcUC.Service{Repo: stub}
+
+			// Use empty filter for testing
+			filters := repository.SourceSearchFilters{}
+			_, err := svc.SearchWithFilters(context.Background(), tt.keywords, filters)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SearchWithFilters() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+/* 12. Delete: 正常削除とリポジトリエラー */
 func TestService_Delete_success(t *testing.T) {
 	tests := []struct {
 		name      string

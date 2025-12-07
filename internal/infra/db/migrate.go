@@ -47,6 +47,24 @@ CREATE TABLE IF NOT EXISTS articles (
 		`CREATE INDEX IF NOT EXISTS idx_sources_source_type ON sources(source_type)`,
 	}
 
+	// pg_trgm拡張を有効化（ILIKE検索高速化用）
+	// エラーを無視（既に存在する場合やスーパーユーザー権限がない場合）
+	_, _ = db.Exec(`CREATE EXTENSION IF NOT EXISTS pg_trgm`)
+
+	// ILIKE検索用GINインデックス追加（マルチキーワード検索高速化）
+	searchIndexes := []string{
+		// 記事タイトル・サマリーのILIKE検索用
+		`CREATE INDEX IF NOT EXISTS idx_articles_title_gin ON articles USING gin(title gin_trgm_ops)`,
+		`CREATE INDEX IF NOT EXISTS idx_articles_summary_gin ON articles USING gin(summary gin_trgm_ops)`,
+		// ソース名・URLのILIKE検索用
+		`CREATE INDEX IF NOT EXISTS idx_sources_name_gin ON sources USING gin(name gin_trgm_ops)`,
+		`CREATE INDEX IF NOT EXISTS idx_sources_feed_url_gin ON sources USING gin(feed_url gin_trgm_ops)`,
+	}
+	for _, idx := range searchIndexes {
+		// pg_trgm拡張がない場合はエラーになるため無視
+		_, _ = db.Exec(idx)
+	}
+
 	for _, idx := range indexes {
 		if _, err := db.Exec(idx); err != nil {
 			return err

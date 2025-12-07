@@ -33,6 +33,9 @@ func (s *stubArticleRepo) Get(_ context.Context, _ int64) (*entity.Article, erro
 func (s *stubArticleRepo) Search(_ context.Context, _ string) ([]*entity.Article, error) {
 	return nil, nil
 }
+func (s *stubArticleRepo) SearchWithFilters(_ context.Context, _ []string, _ repository.ArticleSearchFilters) ([]*entity.Article, error) {
+	return nil, nil
+}
 func (s *stubArticleRepo) Create(_ context.Context, _ *entity.Article) error {
 	return nil
 }
