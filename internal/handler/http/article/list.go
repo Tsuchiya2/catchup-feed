@@ -21,21 +21,22 @@ type ListHandler struct{ Svc artUC.Service }
 // @Failure      500 {string} string "サーバーエラー"
 // @Router       /articles [get]
 func (h ListHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	list, err := h.Svc.List(r.Context())
+	list, err := h.Svc.ListWithSource(r.Context())
 	if err != nil {
 		respond.SafeError(w, http.StatusInternalServerError, err)
 		return
 	}
 	out := make([]DTO, 0, len(list))
-	for _, e := range list {
+	for _, item := range list {
 		out = append(out, DTO{
-			ID:          e.ID,
-			SourceID:    e.SourceID,
-			Title:       e.Title,
-			URL:         e.URL,
-			Summary:     e.Summary,
-			PublishedAt: e.PublishedAt,
-			CreatedAt:   e.CreatedAt,
+			ID:          item.Article.ID,
+			SourceID:    item.Article.SourceID,
+			SourceName:  item.SourceName,
+			Title:       item.Article.Title,
+			URL:         item.Article.URL,
+			Summary:     item.Article.Summary,
+			PublishedAt: item.Article.PublishedAt,
+			CreatedAt:   item.Article.CreatedAt,
 		})
 	}
 	respond.JSON(w, http.StatusOK, out)

@@ -9,6 +9,7 @@ import (
 
 	"catchup-feed/internal/domain/entity"
 	"catchup-feed/internal/handler/http/article"
+	"catchup-feed/internal/repository"
 	artUC "catchup-feed/internal/usecase/article"
 )
 
@@ -53,6 +54,29 @@ func (b *benchListRepo) ExistsByURL(_ context.Context, _ string) (bool, error) {
 }
 func (b *benchListRepo) ExistsByURLBatch(_ context.Context, _ []string) (map[string]bool, error) {
 	return nil, nil
+}
+func (b *benchListRepo) GetWithSource(_ context.Context, _ int64) (*entity.Article, string, error) {
+	return nil, "", nil
+}
+func (b *benchListRepo) ListWithSource(_ context.Context) ([]repository.ArticleWithSource, error) {
+	// 100件の記事を返すシミュレーション
+	result := make([]repository.ArticleWithSource, 100)
+	now := time.Now()
+	for i := 0; i < 100; i++ {
+		result[i] = repository.ArticleWithSource{
+			Article: &entity.Article{
+				ID:          int64(i + 1),
+				SourceID:    1,
+				Title:       "Benchmark Article Title",
+				URL:         "https://example.com/article",
+				Summary:     "This is a test summary for benchmark",
+				PublishedAt: now,
+				CreatedAt:   now,
+			},
+			SourceName: "Benchmark Source",
+		}
+	}
+	return result, nil
 }
 
 // BenchmarkListHandler_100Articles は100件の記事一覧取得の性能を測定

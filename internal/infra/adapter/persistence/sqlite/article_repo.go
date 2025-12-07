@@ -55,6 +55,46 @@ ORDER BY published_at DESC
 	return articles, nil
 }
 
+// ListWithSource retrieves all articles with their source names.
+func (repo *ArticleRepo) ListWithSource(ctx context.Context) ([]repository.ArticleWithSource, error) {
+	const query = `
+SELECT a.id, a.source_id, a.title, a.url, a.summary, a.published_at, a.created_at, s.name AS source_name
+FROM articles a
+INNER JOIN sources s ON a.source_id = s.id
+ORDER BY a.published_at DESC
+`
+
+	rows, err := repo.db.QueryContext(ctx, query)
+	if err != nil {
+		return nil, fmt.Errorf("ListWithSource: QueryContext: %w", err)
+	}
+	defer func() { _ = rows.Close() }()
+
+	// パフォーマンス最適化: メモリ再割り当てを削減するため事前割り当て
+	result := make([]repository.ArticleWithSource, 0, 100)
+	for rows.Next() {
+		var article entity.Article
+		var sourceName string
+		err := rows.Scan(&article.ID,
+			&article.SourceID, &article.Title,
+			&article.URL, &article.Summary,
+			&article.PublishedAt, &article.CreatedAt, &sourceName)
+		if err != nil {
+			return nil, fmt.Errorf("ListWithSource: Scan: %w", err)
+		}
+		result = append(result, repository.ArticleWithSource{
+			Article:    &article,
+			SourceName: sourceName,
+		})
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("ListWithSource: rows.Err: %w", err)
+	}
+
+	return result, nil
+}
+
 func (repo *ArticleRepo) Get(ctx context.Context, id int64) (*entity.Article, error) {
 	const query = `
 SELECT id, source_id, title, url, summary, published_at, created_at
@@ -74,6 +114,29 @@ LIMIT 1
 		return nil, fmt.Errorf("Get: QueryRowContext: %w", err)
 	}
 	return &article, nil
+}
+
+func (repo *ArticleRepo) GetWithSource(ctx context.Context, id int64) (*entity.Article, string, error) {
+	const query = `
+SELECT a.id, a.source_id, a.title, a.url, a.summary, a.published_at, a.created_at, s.name AS source_name
+FROM articles a
+INNER JOIN sources s ON a.source_id = s.id
+WHERE a.id = ?
+LIMIT 1
+`
+	var article entity.Article
+	var sourceName string
+	err := repo.db.QueryRowContext(ctx, query, id).Scan(
+		&article.ID, &article.SourceID, &article.Title, &article.URL,
+		&article.Summary, &article.PublishedAt, &article.CreatedAt, &sourceName,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, "", nil
+		}
+		return nil, "", fmt.Errorf("GetWithSource: QueryRowContext: %w", err)
+	}
+	return &article, sourceName, nil
 }
 
 func (repo *ArticleRepo) Search(ctx context.Context, keyword string) ([]*entity.Article, error) {

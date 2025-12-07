@@ -45,6 +45,16 @@ func (s *Service) List(ctx context.Context) ([]*entity.Article, error) {
 	return articles, nil
 }
 
+// ListWithSource retrieves all articles with their source names.
+// Returns an error if the repository operation fails.
+func (s *Service) ListWithSource(ctx context.Context) ([]repository.ArticleWithSource, error) {
+	articles, err := s.Repo.ListWithSource(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("list articles with source: %w", err)
+	}
+	return articles, nil
+}
+
 // Get retrieves a single article by its ID.
 // Returns ErrInvalidArticleID if the ID is not positive.
 // Returns ErrArticleNotFound if the article does not exist.
@@ -61,6 +71,24 @@ func (s *Service) Get(ctx context.Context, id int64) (*entity.Article, error) {
 		return nil, ErrArticleNotFound
 	}
 	return article, nil
+}
+
+// GetWithSource retrieves a single article by its ID along with the source name.
+// Returns ErrInvalidArticleID if the ID is not positive.
+// Returns ErrArticleNotFound if the article does not exist.
+func (s *Service) GetWithSource(ctx context.Context, id int64) (*entity.Article, string, error) {
+	if id <= 0 {
+		return nil, "", ErrInvalidArticleID
+	}
+
+	article, sourceName, err := s.Repo.GetWithSource(ctx, id)
+	if err != nil {
+		return nil, "", fmt.Errorf("get article with source: %w", err)
+	}
+	if article == nil {
+		return nil, "", ErrArticleNotFound
+	}
+	return article, sourceName, nil
 }
 
 // Search finds articles matching the given keyword.

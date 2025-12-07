@@ -9,6 +9,7 @@ import (
 
 	"catchup-feed/internal/domain/entity"
 	"catchup-feed/internal/handler/http/article"
+	"catchup-feed/internal/repository"
 	artUC "catchup-feed/internal/usecase/article"
 )
 
@@ -47,6 +48,12 @@ func (s *stubDeleteRepo) ExistsByURL(_ context.Context, _ string) (bool, error) 
 	return false, nil
 }
 func (s *stubDeleteRepo) ExistsByURLBatch(_ context.Context, _ []string) (map[string]bool, error) {
+	return nil, nil
+}
+func (s *stubDeleteRepo) GetWithSource(_ context.Context, _ int64) (*entity.Article, string, error) {
+	return nil, "", nil
+}
+func (s *stubDeleteRepo) ListWithSource(_ context.Context) ([]repository.ArticleWithSource, error) {
 	return nil, nil
 }
 

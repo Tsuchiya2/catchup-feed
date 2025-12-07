@@ -8,6 +8,7 @@ import "time"
 type DTO struct {
 	ID          int64     `json:"id" example:"1"`
 	SourceID    int64     `json:"source_id" example:"1"`
+	SourceName  string    `json:"source_name,omitempty" example:"Go Blog"`
 	Title       string    `json:"title" example:"Go 1.23 リリース"`
 	URL         string    `json:"url" example:"https://example.com/article/1"`
 	Summary     string    `json:"summary" example:"Go 1.23 がリリースされました。新機能には..."`
