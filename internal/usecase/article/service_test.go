@@ -39,6 +39,17 @@ func (s *stubRepo) Get(_ context.Context, id int64) (*entity.Article, error) {
 func (s *stubRepo) Search(_ context.Context, _ string) ([]*entity.Article, error) {
 	return nil, s.err // テストでは未使用
 }
+func (s *stubRepo) SearchWithFilters(_ context.Context, keywords []string, filters repository.ArticleSearchFilters) ([]*entity.Article, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	// スタブではフィルタリングせず、data内のすべての記事を返す
+	var out []*entity.Article
+	for _, v := range s.data {
+		out = append(out, v)
+	}
+	return out, nil
+}
 func (s *stubRepo) Create(_ context.Context, a *entity.Article) error {
 	if s.err != nil {
 		return s.err
@@ -804,7 +815,109 @@ func TestService_GetWithSource(t *testing.T) {
 	}
 }
 
-/* ───────── 13. Delete: 正常削除とリポジトリエラー ───────── */
+/* ───────── 13. SearchWithFilters: マルチキーワード検索とフィルタ ───────── */
+
+func TestService_SearchWithFilters(t *testing.T) {
+	now := time.Now()
+
+	tests := []struct {
+		name      string
+		keywords  []string
+		filters   repository.ArticleSearchFilters
+		setupRepo func(*stubRepo)
+		wantCount int
+		wantErr   bool
+	}{
+		{
+			name:     "single keyword search",
+			keywords: []string{"Go"},
+			filters:  repository.ArticleSearchFilters{},
+			setupRepo: func(s *stubRepo) {
+				s.data[1] = &entity.Article{ID: 1, SourceID: 1, Title: "Go Programming", URL: "https://example.com/1", PublishedAt: now}
+				s.data[2] = &entity.Article{ID: 2, SourceID: 1, Title: "React Tutorial", URL: "https://example.com/2", PublishedAt: now}
+			},
+			wantCount: 2,
+			wantErr:   false,
+		},
+		{
+			name:     "multi keyword search",
+			keywords: []string{"Go", "Programming"},
+			filters:  repository.ArticleSearchFilters{},
+			setupRepo: func(s *stubRepo) {
+				s.data[1] = &entity.Article{ID: 1, SourceID: 1, Title: "Go Programming", URL: "https://example.com/1", PublishedAt: now}
+				s.data[2] = &entity.Article{ID: 2, SourceID: 1, Title: "Go Tutorial", URL: "https://example.com/2", PublishedAt: now}
+			},
+			wantCount: 2,
+			wantErr:   false,
+		},
+		{
+			name:     "with source_id filter",
+			keywords: []string{"test"},
+			filters: repository.ArticleSearchFilters{
+				SourceID: func() *int64 { id := int64(1); return &id }(),
+			},
+			setupRepo: func(s *stubRepo) {
+				s.data[1] = &entity.Article{ID: 1, SourceID: 1, Title: "Test Article", URL: "https://example.com/1", PublishedAt: now}
+			},
+			wantCount: 1,
+			wantErr:   false,
+		},
+		{
+			name:     "with date range filter",
+			keywords: []string{"test"},
+			filters: repository.ArticleSearchFilters{
+				From: &now,
+				To:   func() *time.Time { t := now.Add(24 * time.Hour); return &t }(),
+			},
+			setupRepo: func(s *stubRepo) {
+				s.data[1] = &entity.Article{ID: 1, SourceID: 1, Title: "Test Article", URL: "https://example.com/1", PublishedAt: now}
+			},
+			wantCount: 1,
+			wantErr:   false,
+		},
+		{
+			name:     "repository error",
+			keywords: []string{"test"},
+			filters:  repository.ArticleSearchFilters{},
+			setupRepo: func(s *stubRepo) {
+				s.err = errors.New("search error")
+			},
+			wantCount: 0,
+			wantErr:   true,
+		},
+		{
+			name:     "empty result",
+			keywords: []string{"nonexistent"},
+			filters:  repository.ArticleSearchFilters{},
+			setupRepo: func(s *stubRepo) {
+				// 空のまま
+			},
+			wantCount: 0,
+			wantErr:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stub := newStub()
+			tt.setupRepo(stub)
+			svc := artUC.Service{Repo: stub}
+
+			articles, err := svc.SearchWithFilters(context.Background(), tt.keywords, tt.filters)
+
+			if (err != nil) != tt.wantErr {
+				t.Errorf("SearchWithFilters() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+
+			if !tt.wantErr && len(articles) != tt.wantCount {
+				t.Errorf("SearchWithFilters() got %d articles, want %d", len(articles), tt.wantCount)
+			}
+		})
+	}
+}
+
+/* ───────── 14. Delete: 正常削除とリポジトリエラー ───────── */
 
 func TestService_Delete_success(t *testing.T) {
 	tests := []struct {

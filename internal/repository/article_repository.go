@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"catchup-feed/internal/domain/entity"
 )
@@ -10,6 +11,13 @@ import (
 type ArticleWithSource struct {
 	Article    *entity.Article
 	SourceName string
+}
+
+// ArticleSearchFilters contains optional filters for article search
+type ArticleSearchFilters struct {
+	SourceID *int64     // Optional: Filter by source ID
+	From     *time.Time // Optional: Filter articles published >= this date
+	To       *time.Time // Optional: Filter articles published <= this date
 }
 
 type ArticleRepository interface {
@@ -23,6 +31,8 @@ type ArticleRepository interface {
 	// Returns (nil, "", nil) if the article is not found.
 	GetWithSource(ctx context.Context, id int64) (*entity.Article, string, error)
 	Search(ctx context.Context, keyword string) ([]*entity.Article, error)
+	// SearchWithFilters searches articles with multi-keyword AND logic and optional filters
+	SearchWithFilters(ctx context.Context, keywords []string, filters ArticleSearchFilters) ([]*entity.Article, error)
 	Create(ctx context.Context, article *entity.Article) error
 	Update(ctx context.Context, article *entity.Article) error
 	Delete(ctx context.Context, id int64) error

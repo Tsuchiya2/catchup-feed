@@ -11,6 +11,7 @@ import (
 
 	"catchup-feed/internal/domain/entity"
 	"catchup-feed/internal/infra/adapter/persistence/postgres"
+	"catchup-feed/internal/repository"
 )
 
 /* ──────────────────────────────── ヘルパ ──────────────────────────────── */
@@ -272,7 +273,273 @@ func TestSourceRepo_TouchCrawledAt_NonExistent(t *testing.T) {
 	}
 }
 
-/* ──────────────────────────────── 9. Error Cases ──────────────────────────────── */
+/* ──────────────────────────────── 9. SearchWithFilters ──────────────────────────────── */
+
+func TestSourceRepo_SearchWithFilters_SingleKeyword(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	rows := sqlmock.NewRows([]string{
+		"id", "name", "feed_url", "last_crawled_at", "active",
+		"source_type", "scraper_config",
+	}).AddRow(1, "Go Blog", "https://go.dev/blog/feed", &now, true, "RSS", nil)
+
+	mock.ExpectQuery(`FROM sources`).
+		WithArgs("%Go%"). // EscapeILIKE wraps with %
+		WillReturnRows(rows)
+
+	repo := postgres.NewSourceRepo(db)
+	sources, err := repo.SearchWithFilters(context.Background(), []string{"Go"}, repository.SourceSearchFilters{})
+	if err != nil {
+		t.Fatalf("SearchWithFilters err=%v", err)
+	}
+	if len(sources) != 1 {
+		t.Fatalf("expected 1 source, got %d", len(sources))
+	}
+	if sources[0].Name != "Go Blog" {
+		t.Fatalf("expected Go Blog, got %s", sources[0].Name)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSourceRepo_SearchWithFilters_MultipleKeywords(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	rows := sqlmock.NewRows([]string{
+		"id", "name", "feed_url", "last_crawled_at", "active",
+		"source_type", "scraper_config",
+	}).AddRow(1, "Go Blog", "https://go.dev/blog/feed", &now, true, "RSS", nil)
+
+	// Multiple keywords with AND logic
+	mock.ExpectQuery(`FROM sources`).
+		WithArgs("%Go%", "%blog%").
+		WillReturnRows(rows)
+
+	repo := postgres.NewSourceRepo(db)
+	sources, err := repo.SearchWithFilters(context.Background(), []string{"Go", "blog"}, repository.SourceSearchFilters{})
+	if err != nil {
+		t.Fatalf("SearchWithFilters err=%v", err)
+	}
+	if len(sources) != 1 {
+		t.Fatalf("expected 1 source, got %d", len(sources))
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSourceRepo_SearchWithFilters_WithSourceTypeFilter(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	rows := sqlmock.NewRows([]string{
+		"id", "name", "feed_url", "last_crawled_at", "active",
+		"source_type", "scraper_config",
+	}).AddRow(2, "Webflow Blog", "https://webflow.com/blog", &now, true, "Webflow", nil)
+
+	sourceType := "Webflow"
+	filters := repository.SourceSearchFilters{
+		SourceType: &sourceType,
+	}
+
+	mock.ExpectQuery(`FROM sources`).
+		WithArgs("%blog%", "Webflow").
+		WillReturnRows(rows)
+
+	repo := postgres.NewSourceRepo(db)
+	sources, err := repo.SearchWithFilters(context.Background(), []string{"blog"}, filters)
+	if err != nil {
+		t.Fatalf("SearchWithFilters err=%v", err)
+	}
+	if len(sources) != 1 {
+		t.Fatalf("expected 1 source, got %d", len(sources))
+	}
+	if sources[0].SourceType != "Webflow" {
+		t.Fatalf("expected Webflow, got %s", sources[0].SourceType)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSourceRepo_SearchWithFilters_WithActiveFilter(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	rows := sqlmock.NewRows([]string{
+		"id", "name", "feed_url", "last_crawled_at", "active",
+		"source_type", "scraper_config",
+	}).AddRow(1, "Active Blog", "https://active.com/feed", &now, true, "RSS", nil)
+
+	active := true
+	filters := repository.SourceSearchFilters{
+		Active: &active,
+	}
+
+	mock.ExpectQuery(`FROM sources`).
+		WithArgs("%blog%", true).
+		WillReturnRows(rows)
+
+	repo := postgres.NewSourceRepo(db)
+	sources, err := repo.SearchWithFilters(context.Background(), []string{"blog"}, filters)
+	if err != nil {
+		t.Fatalf("SearchWithFilters err=%v", err)
+	}
+	if len(sources) != 1 {
+		t.Fatalf("expected 1 source, got %d", len(sources))
+	}
+	if !sources[0].Active {
+		t.Fatal("expected active source")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSourceRepo_SearchWithFilters_WithAllFilters(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	rows := sqlmock.NewRows([]string{
+		"id", "name", "feed_url", "last_crawled_at", "active",
+		"source_type", "scraper_config",
+	}).AddRow(1, "Go Blog RSS", "https://go.dev/feed", &now, true, "RSS", nil)
+
+	sourceType := "RSS"
+	active := true
+	filters := repository.SourceSearchFilters{
+		SourceType: &sourceType,
+		Active:     &active,
+	}
+
+	mock.ExpectQuery(`FROM sources`).
+		WithArgs("%Go%", "%blog%", "RSS", true).
+		WillReturnRows(rows)
+
+	repo := postgres.NewSourceRepo(db)
+	sources, err := repo.SearchWithFilters(context.Background(), []string{"Go", "blog"}, filters)
+	if err != nil {
+		t.Fatalf("SearchWithFilters err=%v", err)
+	}
+	if len(sources) != 1 {
+		t.Fatalf("expected 1 source, got %d", len(sources))
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSourceRepo_SearchWithFilters_EmptyKeywords(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	repo := postgres.NewSourceRepo(db)
+	sources, err := repo.SearchWithFilters(context.Background(), []string{}, repository.SourceSearchFilters{})
+	if err != nil {
+		t.Fatalf("SearchWithFilters err=%v", err)
+	}
+	if len(sources) != 0 {
+		t.Fatalf("expected 0 sources, got %d", len(sources))
+	}
+	// No query should be executed for empty keywords
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSourceRepo_SearchWithFilters_SpecialCharacters(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	rows := sqlmock.NewRows([]string{
+		"id", "name", "feed_url", "last_crawled_at", "active",
+		"source_type", "scraper_config",
+	}).AddRow(1, "100% Go", "https://go100.com/feed", &now, true, "RSS", nil)
+
+	// EscapeILIKE should escape % as \%
+	mock.ExpectQuery(`FROM sources`).
+		WithArgs("%100\\%%"). // 100% -> %100\%%
+		WillReturnRows(rows)
+
+	repo := postgres.NewSourceRepo(db)
+	sources, err := repo.SearchWithFilters(context.Background(), []string{"100%"}, repository.SourceSearchFilters{})
+	if err != nil {
+		t.Fatalf("SearchWithFilters err=%v", err)
+	}
+	if len(sources) != 1 {
+		t.Fatalf("expected 1 source, got %d", len(sources))
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSourceRepo_SearchWithFilters_UnderscoreEscape(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	rows := sqlmock.NewRows([]string{
+		"id", "name", "feed_url", "last_crawled_at", "active",
+		"source_type", "scraper_config",
+	}).AddRow(1, "my_blog", "https://myblog.com/feed", &now, true, "RSS", nil)
+
+	// EscapeILIKE should escape _ as \_
+	mock.ExpectQuery(`FROM sources`).
+		WithArgs("%my\\_blog%"). // my_blog -> %my\_blog%
+		WillReturnRows(rows)
+
+	repo := postgres.NewSourceRepo(db)
+	sources, err := repo.SearchWithFilters(context.Background(), []string{"my_blog"}, repository.SourceSearchFilters{})
+	if err != nil {
+		t.Fatalf("SearchWithFilters err=%v", err)
+	}
+	if len(sources) != 1 {
+		t.Fatalf("expected 1 source, got %d", len(sources))
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestSourceRepo_SearchWithFilters_BackslashEscape(t *testing.T) {
+	db, mock, _ := sqlmock.New()
+	defer func() { _ = db.Close() }()
+
+	now := time.Now()
+	rows := sqlmock.NewRows([]string{
+		"id", "name", "feed_url", "last_crawled_at", "active",
+		"source_type", "scraper_config",
+	}).AddRow(1, "path\\file", "https://example.com/feed", &now, true, "RSS", nil)
+
+	// EscapeILIKE should escape \ as \\
+	mock.ExpectQuery(`FROM sources`).
+		WithArgs("%path\\\\file%"). // path\file -> %path\\file%
+		WillReturnRows(rows)
+
+	repo := postgres.NewSourceRepo(db)
+	sources, err := repo.SearchWithFilters(context.Background(), []string{"path\\file"}, repository.SourceSearchFilters{})
+	if err != nil {
+		t.Fatalf("SearchWithFilters err=%v", err)
+	}
+	if len(sources) != 1 {
+		t.Fatalf("expected 1 source, got %d", len(sources))
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatal(err)
+	}
+}
+
+/* ──────────────────────────────── 10. Error Cases ──────────────────────────────── */
 
 func TestSourceRepo_Update_NoRowsAffected(t *testing.T) {
 	db, mock, _ := sqlmock.New()

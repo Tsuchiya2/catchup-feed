@@ -11,6 +11,7 @@ import (
 
 	"catchup-feed/internal/domain/entity"
 	"catchup-feed/internal/handler/http/source"
+	"catchup-feed/internal/repository"
 	srcUC "catchup-feed/internal/usecase/source"
 )
 
@@ -33,6 +34,9 @@ func (s *stubSourceRepo) ListActive(_ context.Context) ([]*entity.Source, error)
 	return nil, nil
 }
 func (s *stubSourceRepo) Search(_ context.Context, _ string) ([]*entity.Source, error) {
+	return nil, nil
+}
+func (s *stubSourceRepo) SearchWithFilters(_ context.Context, _ []string, _ repository.SourceSearchFilters) ([]*entity.Source, error) {
 	return nil, nil
 }
 func (s *stubSourceRepo) Create(_ context.Context, _ *entity.Source) error {

@@ -102,6 +102,18 @@ func (s *Service) Search(ctx context.Context, kw string) ([]*entity.Article, err
 	return articles, nil
 }
 
+// SearchWithFilters searches articles with multi-keyword support and optional filters.
+// Keywords are space-separated and use AND logic (all keywords must match).
+// Filters are optional and applied if provided.
+// Returns an error if the repository operation fails.
+func (s *Service) SearchWithFilters(ctx context.Context, keywords []string, filters repository.ArticleSearchFilters) ([]*entity.Article, error) {
+	articles, err := s.Repo.SearchWithFilters(ctx, keywords, filters)
+	if err != nil {
+		return nil, fmt.Errorf("search articles with filters: %w", err)
+	}
+	return articles, nil
+}
+
 // Create creates a new article with the provided input.
 // It validates the input data including URL format before creating the article.
 // Returns a ValidationError if any input field is invalid.

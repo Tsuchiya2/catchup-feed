@@ -38,6 +38,9 @@ func (s *stubDeleteRepo) Get(_ context.Context, _ int64) (*entity.Article, error
 func (s *stubDeleteRepo) Search(_ context.Context, _ string) ([]*entity.Article, error) {
 	return nil, nil
 }
+func (s *stubDeleteRepo) SearchWithFilters(_ context.Context, _ []string, _ repository.ArticleSearchFilters) ([]*entity.Article, error) {
+	return nil, nil
+}
 func (s *stubDeleteRepo) Create(_ context.Context, _ *entity.Article) error {
 	return nil
 }

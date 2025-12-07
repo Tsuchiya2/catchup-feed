@@ -11,6 +11,7 @@ import (
 
 	"catchup-feed/internal/domain/entity"
 	"catchup-feed/internal/handler/http/source"
+	"catchup-feed/internal/repository"
 	srcUC "catchup-feed/internal/usecase/source"
 )
 
@@ -37,6 +38,9 @@ func (s *stubCreateRepo) ListActive(_ context.Context) ([]*entity.Source, error)
 	return nil, nil
 }
 func (s *stubCreateRepo) Search(_ context.Context, _ string) ([]*entity.Source, error) {
+	return nil, nil
+}
+func (s *stubCreateRepo) SearchWithFilters(_ context.Context, _ []string, _ repository.SourceSearchFilters) ([]*entity.Source, error) {
 	return nil, nil
 }
 func (s *stubCreateRepo) Update(_ context.Context, _ *entity.Source) error {
@@ -168,6 +172,9 @@ func (s *stubUpdateRepo) ListActive(_ context.Context) ([]*entity.Source, error)
 func (s *stubUpdateRepo) Search(_ context.Context, _ string) ([]*entity.Source, error) {
 	return nil, nil
 }
+func (s *stubUpdateRepo) SearchWithFilters(_ context.Context, _ []string, _ repository.SourceSearchFilters) ([]*entity.Source, error) {
+	return nil, nil
+}
 func (s *stubUpdateRepo) Create(_ context.Context, _ *entity.Source) error {
 	return nil
 }
@@ -272,6 +279,9 @@ func (s *stubDeleteRepo) ListActive(_ context.Context) ([]*entity.Source, error)
 func (s *stubDeleteRepo) Search(_ context.Context, _ string) ([]*entity.Source, error) {
 	return nil, nil
 }
+func (s *stubDeleteRepo) SearchWithFilters(_ context.Context, _ []string, _ repository.SourceSearchFilters) ([]*entity.Source, error) {
+	return nil, nil
+}
 func (s *stubDeleteRepo) Create(_ context.Context, _ *entity.Source) error {
 	return nil
 }
@@ -324,12 +334,17 @@ func TestDeleteHandler_InvalidID(t *testing.T) {
 /* ───────── Search Handler テスト ───────── */
 
 type stubSearchRepo struct {
-	sources   []*entity.Source
-	searchErr error
+	sources          []*entity.Source
+	searchErr        error
+	searchWithFilter error
 }
 
 func (s *stubSearchRepo) Search(_ context.Context, _ string) ([]*entity.Source, error) {
 	return s.sources, s.searchErr
+}
+
+func (s *stubSearchRepo) SearchWithFilters(_ context.Context, keywords []string, filters repository.SourceSearchFilters) ([]*entity.Source, error) {
+	return s.sources, s.searchWithFilter
 }
 
 // 以下は未使用だが、インターフェース満たすために実装
@@ -428,5 +443,211 @@ func TestSearchHandler_EmptyResult(t *testing.T) {
 
 	if len(result) != 0 {
 		t.Fatalf("result length = %d, want 0", len(result))
+	}
+}
+
+// ───────── SearchWithFilters Tests ─────────
+
+func TestSearchHandler_MultiKeyword(t *testing.T) {
+	now := time.Now()
+	stub := &stubSearchRepo{
+		sources: []*entity.Source{
+			{
+				ID:            1,
+				Name:          "Go Official Blog",
+				FeedURL:       "https://go.dev/blog/feed",
+				LastCrawledAt: &now,
+				Active:        true,
+			},
+		},
+	}
+	handler := source.SearchHandler{Svc: srcUC.Service{Repo: stub}}
+
+	req := httptest.NewRequest(http.MethodGet, "/sources/search?keyword=Go+blog", nil)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", rr.Code, http.StatusOK)
+	}
+
+	var result []source.DTO
+	if err := json.NewDecoder(rr.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(result) != 1 {
+		t.Fatalf("result length = %d, want 1", len(result))
+	}
+}
+
+func TestSearchHandler_WithSourceTypeFilter(t *testing.T) {
+	now := time.Now()
+	stub := &stubSearchRepo{
+		sources: []*entity.Source{
+			{
+				ID:            1,
+				Name:          "RSS Feed",
+				FeedURL:       "https://example.com/feed",
+				LastCrawledAt: &now,
+				Active:        true,
+			},
+		},
+	}
+	handler := source.SearchHandler{Svc: srcUC.Service{Repo: stub}}
+
+	req := httptest.NewRequest(http.MethodGet, "/sources/search?keyword=RSS&source_type=RSS", nil)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", rr.Code, http.StatusOK)
+	}
+
+	var result []source.DTO
+	if err := json.NewDecoder(rr.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(result) != 1 {
+		t.Fatalf("result length = %d, want 1", len(result))
+	}
+}
+
+func TestSearchHandler_WithActiveFilter(t *testing.T) {
+	now := time.Now()
+	stub := &stubSearchRepo{
+		sources: []*entity.Source{
+			{
+				ID:            1,
+				Name:          "Active Source",
+				FeedURL:       "https://example.com/feed",
+				LastCrawledAt: &now,
+				Active:        true,
+			},
+		},
+	}
+	handler := source.SearchHandler{Svc: srcUC.Service{Repo: stub}}
+
+	req := httptest.NewRequest(http.MethodGet, "/sources/search?keyword=Active&active=true", nil)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", rr.Code, http.StatusOK)
+	}
+
+	var result []source.DTO
+	if err := json.NewDecoder(rr.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(result) != 1 {
+		t.Fatalf("result length = %d, want 1", len(result))
+	}
+	if !result[0].Active {
+		t.Errorf("result[0].Active = %v, want true", result[0].Active)
+	}
+}
+
+func TestSearchHandler_InvalidSourceType(t *testing.T) {
+	stub := &stubSearchRepo{}
+	handler := source.SearchHandler{Svc: srcUC.Service{Repo: stub}}
+
+	req := httptest.NewRequest(http.MethodGet, "/sources/search?keyword=test&source_type=InvalidType", nil)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status code = %d, want %d", rr.Code, http.StatusBadRequest)
+	}
+}
+
+func TestSearchHandler_InvalidActiveValue(t *testing.T) {
+	stub := &stubSearchRepo{}
+	handler := source.SearchHandler{Svc: srcUC.Service{Repo: stub}}
+
+	req := httptest.NewRequest(http.MethodGet, "/sources/search?keyword=test&active=invalid", nil)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Fatalf("status code = %d, want %d", rr.Code, http.StatusBadRequest)
+	}
+}
+
+func TestSearchHandler_AllFiltersCombined(t *testing.T) {
+	now := time.Now()
+	stub := &stubSearchRepo{
+		sources: []*entity.Source{
+			{
+				ID:            1,
+				Name:          "Go RSS Feed",
+				FeedURL:       "https://go.dev/feed",
+				LastCrawledAt: &now,
+				Active:        true,
+			},
+		},
+	}
+	handler := source.SearchHandler{Svc: srcUC.Service{Repo: stub}}
+
+	req := httptest.NewRequest(http.MethodGet, "/sources/search?keyword=Go+RSS&source_type=RSS&active=true", nil)
+	rr := httptest.NewRecorder()
+
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status code = %d, want %d", rr.Code, http.StatusOK)
+	}
+
+	var result []source.DTO
+	if err := json.NewDecoder(rr.Body).Decode(&result); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(result) != 1 {
+		t.Fatalf("result length = %d, want 1", len(result))
+	}
+	if result[0].Name != "Go RSS Feed" {
+		t.Errorf("result[0].Name = %q, want %q", result[0].Name, "Go RSS Feed")
+	}
+	if !result[0].Active {
+		t.Errorf("result[0].Active = %v, want true", result[0].Active)
+	}
+}
+
+func TestSearchHandler_ValidSourceTypes(t *testing.T) {
+	tests := []struct {
+		name       string
+		sourceType string
+		wantCode   int
+	}{
+		{"RSS", "RSS", http.StatusOK},
+		{"Webflow", "Webflow", http.StatusOK},
+		{"NextJS", "NextJS", http.StatusOK},
+		{"Remix", "Remix", http.StatusOK},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			stub := &stubSearchRepo{
+				sources: []*entity.Source{},
+			}
+			handler := source.SearchHandler{Svc: srcUC.Service{Repo: stub}}
+
+			req := httptest.NewRequest(http.MethodGet, "/sources/search?keyword=test&source_type="+tt.sourceType, nil)
+			rr := httptest.NewRecorder()
+
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != tt.wantCode {
+				t.Fatalf("status code = %d, want %d", rr.Code, tt.wantCode)
+			}
+		})
 	}
 }
