@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"catchup-feed/internal/domain/entity"
+	"catchup-feed/internal/repository"
 	fetchUC "catchup-feed/internal/usecase/fetch"
 	"catchup-feed/internal/usecase/notify"
 )
@@ -133,6 +134,9 @@ func (s *stubArticleRepo) ExistsByURL(_ context.Context, _ string) (bool, error)
 }
 func (s *stubArticleRepo) GetWithSource(_ context.Context, _ int64) (*entity.Article, string, error) {
 	return nil, "", nil
+}
+func (s *stubArticleRepo) ListWithSource(_ context.Context) ([]repository.ArticleWithSource, error) {
+	return nil, nil
 }
 
 // stubFeedFetcher はFeedFetcherのモック実装

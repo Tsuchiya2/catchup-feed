@@ -11,6 +11,7 @@ import (
 
 	"catchup-feed/internal/domain/entity"
 	"catchup-feed/internal/handler/http/article"
+	"catchup-feed/internal/repository"
 	artUC "catchup-feed/internal/usecase/article"
 )
 
@@ -49,6 +50,19 @@ func (s *stubArticleRepo) ExistsByURLBatch(_ context.Context, _ []string) (map[s
 }
 func (s *stubArticleRepo) GetWithSource(_ context.Context, _ int64) (*entity.Article, string, error) {
 	return nil, "", nil
+}
+func (s *stubArticleRepo) ListWithSource(_ context.Context) ([]repository.ArticleWithSource, error) {
+	if s.listErr != nil {
+		return nil, s.listErr
+	}
+	var result []repository.ArticleWithSource
+	for _, a := range s.articles {
+		result = append(result, repository.ArticleWithSource{
+			Article:    a,
+			SourceName: "Test Source",
+		})
+	}
+	return result, nil
 }
 
 /* ───────── テストケース ───────── */

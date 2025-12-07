@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"catchup-feed/internal/domain/entity"
+	"catchup-feed/internal/repository"
 	artUC "catchup-feed/internal/usecase/article"
 )
 
@@ -104,6 +105,21 @@ func (s *stubRepo) GetWithSource(_ context.Context, id int64) (*entity.Article, 
 	// スタブではソース名をダミー値として返す
 	sourceName := "Test Source"
 	return article, sourceName, nil
+}
+
+// ListWithSource retrieves all articles with their source names.
+func (s *stubRepo) ListWithSource(_ context.Context) ([]repository.ArticleWithSource, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	var out []repository.ArticleWithSource
+	for _, v := range s.data {
+		out = append(out, repository.ArticleWithSource{
+			Article:    v,
+			SourceName: "Test Source",
+		})
+	}
+	return out, nil
 }
 
 /* ───────── 1. Create のバリデーション ───────── */

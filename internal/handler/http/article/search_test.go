@@ -11,6 +11,7 @@ import (
 
 	"catchup-feed/internal/domain/entity"
 	"catchup-feed/internal/handler/http/article"
+	"catchup-feed/internal/repository"
 	artUC "catchup-feed/internal/usecase/article"
 )
 
@@ -47,6 +48,9 @@ func (s *stubSearchRepo) ExistsByURLBatch(_ context.Context, _ []string) (map[st
 }
 func (s *stubSearchRepo) GetWithSource(_ context.Context, _ int64) (*entity.Article, string, error) {
 	return nil, "", nil
+}
+func (s *stubSearchRepo) ListWithSource(_ context.Context) ([]repository.ArticleWithSource, error) {
+	return nil, nil
 }
 
 func TestSearchHandler_Success(t *testing.T) {

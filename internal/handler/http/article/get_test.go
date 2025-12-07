@@ -12,6 +12,7 @@ import (
 
 	"catchup-feed/internal/domain/entity"
 	"catchup-feed/internal/handler/http/article"
+	"catchup-feed/internal/repository"
 	artUC "catchup-feed/internal/usecase/article"
 )
 
@@ -56,6 +57,9 @@ func (s *stubGetRepo) ExistsByURL(_ context.Context, _ string) (bool, error) {
 	return false, nil
 }
 func (s *stubGetRepo) ExistsByURLBatch(_ context.Context, _ []string) (map[string]bool, error) {
+	return nil, nil
+}
+func (s *stubGetRepo) ListWithSource(_ context.Context) ([]repository.ArticleWithSource, error) {
 	return nil, nil
 }
 
