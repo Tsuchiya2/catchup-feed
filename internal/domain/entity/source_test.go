@@ -401,10 +401,6 @@ func TestSource_Validate(t *testing.T) {
 				}
 			} else {
 				assert.NoError(t, err)
-				// When SourceType is empty, it should default to RSS
-				if tt.source.SourceType == "" {
-					// Note: Validate modifies the source
-				}
 			}
 		})
 	}

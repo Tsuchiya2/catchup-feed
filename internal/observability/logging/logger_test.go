@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"log/slog"
-	"os"
 	"strings"
 	"testing"
 
@@ -45,8 +44,7 @@ func TestNewLogger(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
 			if tt.logLevel != "" {
-				os.Setenv("LOG_LEVEL", tt.logLevel)
-				defer os.Unsetenv("LOG_LEVEL")
+				t.Setenv("LOG_LEVEL", tt.logLevel)
 			}
 
 			// Act
@@ -78,8 +76,7 @@ func TestNewTextLogger(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
 			if tt.logLevel != "" {
-				os.Setenv("LOG_LEVEL", tt.logLevel)
-				defer os.Unsetenv("LOG_LEVEL")
+				t.Setenv("LOG_LEVEL", tt.logLevel)
 			}
 
 			// Act
@@ -139,8 +136,7 @@ func TestLogger_LogLevels(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			// Arrange
 			if tt.logLevel != "" {
-				os.Setenv("LOG_LEVEL", tt.logLevel)
-				defer os.Unsetenv("LOG_LEVEL")
+				t.Setenv("LOG_LEVEL", tt.logLevel)
 			}
 
 			var buf bytes.Buffer
