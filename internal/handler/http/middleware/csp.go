@@ -106,8 +106,9 @@ func (m *CSPMiddleware) Middleware() func(http.Handler) http.Handler {
 			}
 
 			// Set report-only mode if configured
+			// Clone the policy to avoid mutating the shared PathPolicies entry
 			if m.config.ReportOnly {
-				policy = policy.ReportOnly(true)
+				policy = policy.Clone().ReportOnly(true)
 			}
 
 			// Build CSP header value

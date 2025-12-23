@@ -166,8 +166,9 @@ func (rl *IPRateLimiter) Middleware() func(http.Handler) http.Handler {
 			}
 
 			if err != nil {
-				// Rate limit check failed
-				rl.handleRateLimitError(w, r, ip, err)
+				// Rate limit check failed - log error and allow request (fail-open)
+				rl.handleRateLimitError(r, ip, err)
+				next.ServeHTTP(w, r)
 				return
 			}
 
@@ -353,21 +354,18 @@ func (rl *IPRateLimiter) writeRateLimitError(w http.ResponseWriter, r *http.Requ
 // This method implements fail-open behavior: if the rate limiter fails,
 // the request is allowed through to maintain availability. However, the
 // error is logged and the circuit breaker is notified.
+// The caller is responsible for calling next.ServeHTTP() after this returns (fail-open behavior).
 //
 // Parameters:
-//   - w: HTTP response writer
 //   - r: HTTP request
 //   - ip: Client IP address
 //   - err: Error that occurred
-func (rl *IPRateLimiter) handleRateLimitError(w http.ResponseWriter, r *http.Request, ip string, err error) {
+func (rl *IPRateLimiter) handleRateLimitError(r *http.Request, ip string, err error) {
 	// Log critical error
 	slog.Error("IP rate limiter: check failed, allowing request (fail-open)",
 		slog.String("error", err.Error()),
 		slog.String("ip", ip),
 		slog.String("path", r.URL.Path),
 	)
-
-	// For now, fail open (allow request) for availability
-	// In a stricter security context, we could return 500 or 503
-	w.WriteHeader(http.StatusOK)
+	// Note: Caller should invoke next.ServeHTTP() for fail-open behavior
 }

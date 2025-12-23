@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"log/slog"
+	"net"
 	"time"
 
 	"catchup-feed/pkg/ratelimit"
@@ -274,14 +275,14 @@ func LoadCSPConfig() (*CSPConfig, error) {
 //	    return fmt.Errorf("invalid trusted proxies: %w", err)
 //	}
 func ValidateTrustedProxies(cidrs []string) error {
-	// For now, this is a placeholder
-	// A full implementation would parse each CIDR using net.ParseCIDR
-	// and verify it's a valid IP range
 	for _, cidr := range cidrs {
 		if cidr == "" {
 			return fmt.Errorf("CIDR cannot be empty")
 		}
-		// TODO: Add actual CIDR parsing and validation
+		_, _, err := net.ParseCIDR(cidr)
+		if err != nil {
+			return fmt.Errorf("invalid CIDR %q: %w", cidr, err)
+		}
 	}
 	return nil
 }

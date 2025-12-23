@@ -277,6 +277,37 @@ func (b *CSPBuilder) ReportOnly(enabled bool) *CSPBuilder {
 	return b
 }
 
+// Clone creates a deep copy of the CSPBuilder.
+//
+// This is useful when you need to modify a shared policy for a specific request
+// without affecting the original policy. For example, when enabling ReportOnly
+// mode for a specific context while preserving the original policy state.
+//
+// Returns:
+//   - *CSPBuilder: A new builder instance with copied directives and settings
+//
+// Thread Safety:
+//   - The returned clone is independent and safe to modify
+//   - The original builder is not affected by changes to the clone
+//
+// Example:
+//
+//	original := NewCSPBuilder().DefaultSrc("'self'")
+//	clone := original.Clone().ReportOnly(true)
+//	// original.reportOnly is still false
+//	// clone.reportOnly is true
+func (b *CSPBuilder) Clone() *CSPBuilder {
+	clone := &CSPBuilder{
+		directives: make(map[string][]string, len(b.directives)),
+		reportOnly: b.reportOnly,
+	}
+	for key, values := range b.directives {
+		// Deep copy the slice
+		clone.directives[key] = append([]string(nil), values...)
+	}
+	return clone
+}
+
 // Build generates the CSP header value string.
 //
 // This method constructs the final CSP policy string from all configured directives.

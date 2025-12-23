@@ -240,7 +240,9 @@ func (rl *UserRateLimiter) Middleware() func(http.Handler) http.Handler {
 			// Handle unauthenticated requests
 			if !ok {
 				// Check if we should skip rate limiting for unauthenticated requests
-				skipUnauthenticated := true // default
+				// Default is false (rate limit anonymous users), but this is always
+				// overridden by SkipUnauthenticatedPtr which is set in constructor.
+				skipUnauthenticated := false
 				if rl.config.SkipUnauthenticatedPtr != nil {
 					skipUnauthenticated = *rl.config.SkipUnauthenticatedPtr
 				}
@@ -255,7 +257,8 @@ func (rl *UserRateLimiter) Middleware() func(http.Handler) http.Handler {
 					return
 				}
 
-				// If not skipping, treat as "anonymous" user with Viewer tier (most restrictive)
+				// If not skipping, treat as "anonymous" user with Basic tier
+				// Note: Anonymous users are typically also subject to IP rate limiting
 				userID = "anonymous"
 				tier = ratelimit.TierBasic
 			}
