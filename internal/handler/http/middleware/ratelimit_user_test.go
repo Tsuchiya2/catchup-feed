@@ -12,6 +12,11 @@ import (
 	"catchup-feed/pkg/ratelimit"
 )
 
+// userContextKey is a typed key for context values to avoid collisions.
+type userContextKey string
+
+const testUserContextKey userContextKey = "user"
+
 // mockUserExtractor is a mock implementation of UserExtractor for testing.
 type mockUserExtractor struct {
 	userID string
@@ -43,7 +48,7 @@ func TestNewJWTUserExtractor(t *testing.T) {
 				"user1@example.com": ratelimit.TierPremium,
 			},
 		}
-		extractor := NewJWTUserExtractor("user", provider)
+		extractor := NewJWTUserExtractor(testUserContextKey, provider)
 
 		if extractor == nil {
 			t.Fatal("Expected non-nil extractor")
@@ -51,14 +56,14 @@ func TestNewJWTUserExtractor(t *testing.T) {
 	})
 
 	t.Run("with nil tier provider uses default", func(t *testing.T) {
-		extractor := NewJWTUserExtractor("user", nil)
+		extractor := NewJWTUserExtractor(testUserContextKey, nil)
 
 		if extractor == nil {
 			t.Fatal("Expected non-nil extractor")
 		}
 
 		// Should use default tier provider
-		ctx := context.WithValue(context.Background(), "user", "test@example.com")
+		ctx := context.WithValue(context.Background(), testUserContextKey, "test@example.com")
 		_, tier, ok := extractor.ExtractUser(ctx)
 
 		if !ok {

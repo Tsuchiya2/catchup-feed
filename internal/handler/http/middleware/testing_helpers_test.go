@@ -219,7 +219,7 @@ func (m *mockRateLimitAlgorithm) IsAllowed(ctx context.Context, key string, stor
 
 	if allowed {
 		// Add the request
-		store.AddRequest(ctx, key, now)
+		_ = store.AddRequest(ctx, key, now)
 		return ratelimit.NewAllowedDecision(key, "test", limit, remaining, resetAt), nil
 	}
 

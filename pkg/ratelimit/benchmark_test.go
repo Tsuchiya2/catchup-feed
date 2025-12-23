@@ -22,7 +22,7 @@ func BenchmarkInMemoryStore_AddRequest(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		key := fmt.Sprintf("ip:%d", i%1000)
-		store.AddRequest(ctx, key, time.Now())
+		_ = store.AddRequest(ctx, key, time.Now())
 	}
 }
 
@@ -38,7 +38,7 @@ func BenchmarkInMemoryStore_AddRequest_SingleKey(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		store.AddRequest(ctx, "ip:192.168.1.1", time.Now())
+		_ = store.AddRequest(ctx, "ip:192.168.1.1", time.Now())
 	}
 }
 
@@ -57,7 +57,7 @@ func BenchmarkInMemoryStore_GetRequestCount(b *testing.B) {
 	for i := 0; i < 1000; i++ {
 		key := fmt.Sprintf("ip:%d", i)
 		for j := 0; j < 100; j++ {
-			store.AddRequest(ctx, key, time.Now().Add(-time.Duration(j)*time.Second))
+			_ = store.AddRequest(ctx, key, time.Now().Add(-time.Duration(j)*time.Second))
 		}
 	}
 
@@ -66,7 +66,7 @@ func BenchmarkInMemoryStore_GetRequestCount(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		key := fmt.Sprintf("ip:%d", i%1000)
-		store.GetRequestCount(ctx, key, cutoff)
+		_, _ = store.GetRequestCount(ctx, key, cutoff)
 	}
 }
 
@@ -92,18 +92,18 @@ func BenchmarkInMemoryStore_Cleanup(b *testing.B) {
 			key := fmt.Sprintf("ip:%d", j)
 			// Add old timestamps (should be cleaned up)
 			for k := 0; k < 50; k++ {
-				store.AddRequest(ctx, key, now.Add(-2*time.Hour))
+				_ = store.AddRequest(ctx, key, now.Add(-2*time.Hour))
 			}
 			// Add recent timestamps (should be kept)
 			for k := 0; k < 50; k++ {
-				store.AddRequest(ctx, key, now.Add(-30*time.Minute))
+				_ = store.AddRequest(ctx, key, now.Add(-30*time.Minute))
 			}
 		}
 		b.StartTimer()
 
 		// Cleanup timestamps older than 1 hour
 		cutoff := now.Add(-1 * time.Hour)
-		store.Cleanup(ctx, cutoff)
+		_ = store.Cleanup(ctx, cutoff)
 	}
 }
 
@@ -125,12 +125,12 @@ func BenchmarkInMemoryStore_LRUEviction(b *testing.B) {
 		// Fill the store to capacity
 		for j := 0; j < 1000; j++ {
 			key := fmt.Sprintf("ip:%d", j)
-			store.AddRequest(ctx, key, time.Now())
+			_ = store.AddRequest(ctx, key, time.Now())
 		}
 		b.StartTimer()
 
 		// Add a new key, triggering eviction
-		store.AddRequest(ctx, "ip:new-key", time.Now())
+		_ = store.AddRequest(ctx, "ip:new-key", time.Now())
 	}
 }
 
@@ -152,7 +152,7 @@ func BenchmarkSlidingWindow_IsAllowed(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		key := fmt.Sprintf("ip:%d", i%1000)
-		algo.IsAllowed(ctx, key, store, limit, window)
+		_, _ = algo.IsAllowed(ctx, key, store, limit, window)
 	}
 }
 
@@ -174,7 +174,7 @@ func BenchmarkSlidingWindow_IsAllowed_HighLoad(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		// Simulate 10,000 unique IPs
 		key := fmt.Sprintf("ip:%d", i%10000)
-		algo.IsAllowed(ctx, key, store, limit, window)
+		_, _ = algo.IsAllowed(ctx, key, store, limit, window)
 	}
 }
 
@@ -197,7 +197,7 @@ func BenchmarkSlidingWindow_ConcurrentRequests(b *testing.B) {
 		i := 0
 		for pb.Next() {
 			key := fmt.Sprintf("ip:%d", i%1000)
-			algo.IsAllowed(ctx, key, store, limit, window)
+			_, _ = algo.IsAllowed(ctx, key, store, limit, window)
 			i++
 		}
 	})
@@ -244,7 +244,7 @@ func BenchmarkCircuitBreaker_Execute(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		cb.Execute(operation)
+		_ = cb.Execute(operation)
 	}
 }
 
@@ -274,7 +274,7 @@ func BenchmarkCircuitBreaker_Execute_OpenCircuit(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		cb.Execute(operation)
+		_ = cb.Execute(operation)
 	}
 }
 
@@ -368,7 +368,7 @@ func BenchmarkFullRateLimitCheck(b *testing.B) {
 		key := fmt.Sprintf("ip:%d", i%1000)
 
 		// Full rate limit check
-		cb.Execute(func() error {
+		_ = cb.Execute(func() error {
 			start := time.Now()
 
 			decision, err := algo.IsAllowed(ctx, key, store, limit, window)
@@ -418,7 +418,7 @@ func BenchmarkFullRateLimitCheck_Concurrent(b *testing.B) {
 		for pb.Next() {
 			key := fmt.Sprintf("ip:%d", i%1000)
 
-			cb.Execute(func() error {
+			_ = cb.Execute(func() error {
 				start := time.Now()
 
 				decision, err := algo.IsAllowed(ctx, key, store, limit, window)
@@ -460,7 +460,7 @@ func BenchmarkMemoryPerKey(b *testing.B) {
 	for i := 0; i < numKeys; i++ {
 		key := fmt.Sprintf("ip:%d", i)
 		for j := 0; j < requestsPerKey; j++ {
-			store.AddRequest(ctx, key, time.Now().Add(-time.Duration(j)*time.Second))
+			_ = store.AddRequest(ctx, key, time.Now().Add(-time.Duration(j)*time.Second))
 		}
 	}
 
@@ -498,7 +498,7 @@ func BenchmarkStoreThroughput(b *testing.B) {
 			defer wg.Done()
 			for j := 0; j < requestsPerWorker; j++ {
 				key := fmt.Sprintf("ip:%d", (workerID*requestsPerWorker+j)%1000)
-				algo.IsAllowed(ctx, key, store, limit, window)
+				_, _ = algo.IsAllowed(ctx, key, store, limit, window)
 			}
 		}(i)
 	}
@@ -528,12 +528,12 @@ func BenchmarkCleanupWithDifferentSizes(b *testing.B) {
 				now := time.Now()
 				for j := 0; j < size; j++ {
 					key := fmt.Sprintf("ip:%d", j)
-					store.AddRequest(ctx, key, now.Add(-2*time.Hour))
-					store.AddRequest(ctx, key, now.Add(-30*time.Minute))
+					_ = store.AddRequest(ctx, key, now.Add(-2*time.Hour))
+					_ = store.AddRequest(ctx, key, now.Add(-30*time.Minute))
 				}
 				b.StartTimer()
 
-				store.Cleanup(ctx, now.Add(-1*time.Hour))
+				_ = store.Cleanup(ctx, now.Add(-1*time.Hour))
 			}
 		})
 	}
@@ -554,7 +554,7 @@ func BenchmarkConcurrentReadWrite(b *testing.B) {
 	for i := 0; i < 1000; i++ {
 		key := fmt.Sprintf("ip:%d", i)
 		for j := 0; j < 50; j++ {
-			store.AddRequest(ctx, key, time.Now().Add(-time.Duration(j)*time.Second))
+			_ = store.AddRequest(ctx, key, time.Now().Add(-time.Duration(j)*time.Second))
 		}
 	}
 
@@ -567,10 +567,10 @@ func BenchmarkConcurrentReadWrite(b *testing.B) {
 			key := fmt.Sprintf("ip:%d", i%1000)
 			if i%2 == 0 {
 				// Read operation
-				store.GetRequestCount(ctx, key, cutoff)
+				_, _ = store.GetRequestCount(ctx, key, cutoff)
 			} else {
 				// Write operation
-				store.AddRequest(ctx, key, time.Now())
+				_ = store.AddRequest(ctx, key, time.Now())
 			}
 			i++
 		}

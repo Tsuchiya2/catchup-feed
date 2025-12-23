@@ -16,6 +16,11 @@ import (
 	"catchup-feed/pkg/security/csp"
 )
 
+// contextKey is a typed key for context values to avoid collisions.
+type contextKey string
+
+const userContextKey contextKey = "user"
+
 /* ───────── TASK-020: End-to-End Integration Tests for Full Request Flow ───────── */
 
 // TestIntegration_IPRateLimiting tests the full IP rate limiting flow
@@ -65,7 +70,7 @@ func TestIntegration_IPRateLimiting(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Request %d failed: %v", i+1, err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("Request %d: expected status 200, got %d", i+1, resp.StatusCode)
@@ -130,11 +135,12 @@ func TestIntegration_IPRateLimiting(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Request %d failed: %v", i+1, err)
 			}
-			defer resp.Body.Close()
+			defer func() { _ = resp.Body.Close() }()
 
-			if resp.StatusCode == http.StatusOK {
+			switch resp.StatusCode {
+			case http.StatusOK:
 				successCount++
-			} else if resp.StatusCode == http.StatusTooManyRequests {
+			case http.StatusTooManyRequests:
 				deniedCount++
 
 				// Verify Retry-After header is present on 429 response
@@ -207,7 +213,7 @@ func TestIntegration_IPRateLimiting(t *testing.T) {
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("Initial request %d failed with status %d", i+1, resp.StatusCode)
 			}
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 
 		// 3rd request should be denied
@@ -215,7 +221,7 @@ func TestIntegration_IPRateLimiting(t *testing.T) {
 		if resp.StatusCode != http.StatusTooManyRequests {
 			t.Errorf("3rd request should be denied, got status %d", resp.StatusCode)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		// Wait for window to expire
 		time.Sleep(150 * time.Millisecond)
@@ -225,7 +231,7 @@ func TestIntegration_IPRateLimiting(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Request after window expiry failed with status %d", resp.StatusCode)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	})
 }
 
@@ -283,7 +289,7 @@ func TestIntegration_UserRateLimiting(t *testing.T) {
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Add user to context
-			ctx := context.WithValue(r.Context(), "user", "user-123")
+			ctx := context.WithValue(r.Context(), userContextKey, "user-123")
 			handler.ServeHTTP(w, r.WithContext(ctx))
 		}))
 		defer server.Close()
@@ -294,9 +300,10 @@ func TestIntegration_UserRateLimiting(t *testing.T) {
 		// Make 5 requests (limit is 3 for basic tier)
 		for i := 0; i < 5; i++ {
 			resp, _ := http.Get(server.URL + "/test")
-			if resp.StatusCode == http.StatusOK {
+			switch resp.StatusCode {
+			case http.StatusOK:
 				successCount++
-			} else if resp.StatusCode == http.StatusTooManyRequests {
+			case http.StatusTooManyRequests:
 				deniedCount++
 
 				// Verify rate limit headers
@@ -304,7 +311,7 @@ func TestIntegration_UserRateLimiting(t *testing.T) {
 					t.Errorf("Expected X-RateLimit-Type 'user', got '%s'", resp.Header.Get("X-RateLimit-Type"))
 				}
 			}
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 
 		if successCount != 3 {
@@ -353,7 +360,7 @@ func TestIntegration_UserRateLimiting(t *testing.T) {
 		}))
 
 		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.WithValue(r.Context(), "user", "admin-123")
+			ctx := context.WithValue(r.Context(), userContextKey, "admin-123")
 			handler.ServeHTTP(w, r.WithContext(ctx))
 		}))
 		defer server.Close()
@@ -366,7 +373,7 @@ func TestIntegration_UserRateLimiting(t *testing.T) {
 			if resp.StatusCode == http.StatusOK {
 				successCount++
 			}
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 
 		if successCount != 10 {
@@ -378,7 +385,7 @@ func TestIntegration_UserRateLimiting(t *testing.T) {
 		if resp.StatusCode != http.StatusTooManyRequests {
 			t.Errorf("11th request should be denied, got status %d", resp.StatusCode)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	})
 
 	t.Run("unauthenticated_requests_skip_user_rate_limiting", func(t *testing.T) {
@@ -420,7 +427,7 @@ func TestIntegration_UserRateLimiting(t *testing.T) {
 			if resp.StatusCode != http.StatusOK {
 				t.Errorf("Unauthenticated request %d should succeed, got status %d", i+1, resp.StatusCode)
 			}
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 	})
 }
@@ -569,7 +576,7 @@ func TestIntegration_CircuitBreakerIntegration(t *testing.T) {
 
 		// First request should trigger failure and open circuit
 		resp, _ := http.Get(server.URL + "/test")
-		resp.Body.Close()
+		_ = resp.Body.Close()
 
 		// Wait for circuit to open
 		time.Sleep(50 * time.Millisecond)
@@ -579,7 +586,7 @@ func TestIntegration_CircuitBreakerIntegration(t *testing.T) {
 		if resp.StatusCode != http.StatusOK {
 			t.Errorf("Request should be allowed when circuit is open (fail-open), got status %d", resp.StatusCode)
 		}
-		resp.Body.Close()
+		_ = resp.Body.Close()
 	})
 
 	t.Run("requests_processed_when_rate_limiting_fails", func(t *testing.T) {
@@ -798,7 +805,7 @@ func TestIntegration_FullStackWithAllMiddleware(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Request failed: %v", err)
 		}
-		defer resp.Body.Close()
+		defer func() { _ = resp.Body.Close() }()
 
 		// Verify successful response
 		if resp.StatusCode != http.StatusOK {
@@ -887,7 +894,7 @@ func TestIntegration_FullStackWithAllMiddleware(t *testing.T) {
 					t.Error("CSP header missing on 429 response")
 				}
 			}
-			resp.Body.Close()
+			_ = resp.Body.Close()
 		}
 	})
 
@@ -960,7 +967,7 @@ func TestIntegration_FullStackWithAllMiddleware(t *testing.T) {
 						t.Errorf("Client %d request %d: Rate limit header missing", cid, i+1)
 					}
 
-					resp.Body.Close()
+					_ = resp.Body.Close()
 				}
 			}(clientID)
 		}
@@ -984,7 +991,7 @@ type userInfo struct {
 
 func (m *mockUserExtractor) ExtractUser(ctx context.Context) (string, ratelimit.UserTier, bool) {
 	// Extract user from context
-	userValue := ctx.Value("user")
+	userValue := ctx.Value(userContextKey)
 	if userValue == nil {
 		return "", "", false
 	}

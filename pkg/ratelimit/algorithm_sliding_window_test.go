@@ -83,7 +83,7 @@ func TestSlidingWindowAlgorithm_IsAllowed(t *testing.T) {
 				})
 				// Add 5 requests
 				for i := 0; i < 5; i++ {
-					store.AddRequest(ctx, "user-123", now.Add(time.Duration(i)*time.Second))
+					_ = store.AddRequest(ctx, "user-123", now.Add(time.Duration(i)*time.Second))
 				}
 				return store
 			},
@@ -102,7 +102,7 @@ func TestSlidingWindowAlgorithm_IsAllowed(t *testing.T) {
 				})
 				// Add exactly 10 requests
 				for i := 0; i < 10; i++ {
-					store.AddRequest(ctx, "user-123", now.Add(time.Duration(i)*time.Second))
+					_ = store.AddRequest(ctx, "user-123", now.Add(time.Duration(i)*time.Second))
 				}
 				return store
 			},
@@ -121,7 +121,7 @@ func TestSlidingWindowAlgorithm_IsAllowed(t *testing.T) {
 				})
 				// Add 10 old requests (outside window)
 				for i := 0; i < 10; i++ {
-					store.AddRequest(ctx, "user-123", now.Add(-2*time.Minute))
+					_ = store.AddRequest(ctx, "user-123", now.Add(-2*time.Minute))
 				}
 				return store
 			},
@@ -400,7 +400,7 @@ func TestSlidingWindowAlgorithm_DecisionFields(t *testing.T) {
 
 	// Fill up to limit
 	for i := 0; i < limit-1; i++ {
-		algo.IsAllowed(ctx, key, store, limit, window)
+		_, _ = algo.IsAllowed(ctx, key, store, limit, window)
 	}
 
 	// Denied decision

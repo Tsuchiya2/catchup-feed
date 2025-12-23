@@ -666,7 +666,7 @@ func TestCSPMiddleware_HandlerChain(t *testing.T) {
 	// Create a handler chain with CSP middleware
 	finalHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
+		_, _ = w.Write([]byte("OK"))
 	})
 
 	handler := middleware.Middleware()(finalHandler)

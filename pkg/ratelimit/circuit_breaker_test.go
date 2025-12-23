@@ -207,7 +207,7 @@ func TestCircuitBreaker_Execute_OpenState(t *testing.T) {
 	}
 
 	for i := 0; i < failureThreshold; i++ {
-		cb.Execute(failOp)
+		_ = cb.Execute(failOp)
 	}
 
 	if !cb.IsOpen() {
@@ -249,7 +249,7 @@ func TestCircuitBreaker_Execute_TransitionToHalfOpen(t *testing.T) {
 	}
 
 	for i := 0; i < failureThreshold; i++ {
-		cb.Execute(failOp)
+		_ = cb.Execute(failOp)
 	}
 
 	if !cb.IsOpen() {
@@ -551,7 +551,7 @@ func TestCircuitBreaker_ConcurrentAccess(t *testing.T) {
 					return errors.New("error")
 				}
 
-				cb.Execute(op)
+				_ = cb.Execute(op)
 			}
 		}(i)
 	}
