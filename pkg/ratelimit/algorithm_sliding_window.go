@@ -97,8 +97,8 @@ func (a *SlidingWindowAlgorithm) IsAllowed(
 	limit int,
 	window time.Duration,
 ) (*RateLimitDecision, error) {
-	// Store window duration for GetWindowDuration()
-	a.windowDuration = window
+	// Store window duration for GetWindowDuration() (protected by mutex)
+	a.setWindowDuration(window)
 
 	// Get validated timestamp with clock skew protection
 	now := a.getValidTimestamp(key)
@@ -201,8 +201,23 @@ func (a *SlidingWindowAlgorithm) isAllowedNonAtomic(
 // It is useful for calculating reset times and retry delays.
 //
 // Returns the time window duration.
+//
+// Thread Safety:
+//   - Protected by mutex to ensure thread-safe access to windowDuration
 func (a *SlidingWindowAlgorithm) GetWindowDuration() time.Duration {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
 	return a.windowDuration
+}
+
+// setWindowDuration sets the window duration with mutex protection.
+//
+// Thread Safety:
+//   - Protected by mutex to ensure thread-safe write to windowDuration
+func (a *SlidingWindowAlgorithm) setWindowDuration(window time.Duration) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.windowDuration = window
 }
 
 // getValidTimestamp returns the current time with clock skew protection.
